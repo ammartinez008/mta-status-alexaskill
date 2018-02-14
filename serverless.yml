@@ -1,0 +1,21 @@
+
+service: mta-status # NOTE: update this with your service name
+
+provider:
+  name: aws
+  runtime: go1.x
+
+  stage: valhalla
+  region: us-east-1
+
+package:
+ exclude:
+   - ./**
+ include:
+   - ./mta_status/bin/**
+
+functions:
+  trainstatus:
+    handler: bin/main
+    #events: -- todo: uncomment when ready for alexa testing
+     # - alexaSkill
