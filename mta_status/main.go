@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/xml"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 )
@@ -32,9 +33,10 @@ type Line struct {
 	Time   string `xml:"Time"`
 }
 
-// Handler runs our core functionality for our lambda
-// Requests the most updated subway data from MTA
-// Parses the response into a Service struct
+/* Handler runs our core functionality for our lambda
+*  Requests the most updated subway data from MTA
+*  Parses the response into a Service struct
+ */
 func Handler() (Response, error) {
 	mtaData, err := http.Get("http://web.mta.info/status/serviceStatus.txt")
 	if err != nil {
@@ -49,27 +51,66 @@ func Handler() (Response, error) {
 
 	var mtaDataBody Service
 	xml.Unmarshal(body, &mtaDataBody)
-	GetDataByLine(mtaDataBody)
-
+	subwayMap := GetDataBySubwayLine(mtaDataBody)
+	PrintLinesByStatus(subwayMap)
 	return Response{
 		Message: string(body),
 	}, nil
 }
 
-// GetDataByLine will parse the individual
-// lines text, and will format the data
-// for Alexa to read from
-func GetDataByLine(mtaData Service) {
-	return
+/* GetDataBySubwayLine will parse the individual
+*  lines text, and will format the data
+*  for Alexa to read from
+ */
+func GetDataBySubwayLine(mtaData Service) map[string]string {
+	var subwayMap = make(map[string]string)
+
+	for _, lines := range mtaData.Subways.Lines {
+		MapLineNames(subwayMap, lines)
+	}
+	return subwayMap
 }
 
-// GetErrorMsg returns a Response with an error msg
-// called whenever something goes wrong and we capture
-// and error
+/*  MapLinesNames maps the subway status to
+    a subway line
+*/
+func MapLineNames(subwayMap map[string]string, linesList Line) {
+	// Staten Island Railroad one exception
+	if linesList.Name == "SIR" {
+		subwayMap[linesList.Name] = linesList.Status
+		return
+	}
+
+	for _, line := range linesList.Name {
+		subwayMap[string(line)] = linesList.Status
+	}
+}
+
+/* GetLatestUpdateTime will return the timestamp
+   of MTA Service update
+*/
+func GetLatestUpdateTime(mtaData Service) string {
+	return mtaData.TimeStamp
+}
+
+/* GetErrorMsg returns a Response with an error msg
+*  called whenever something goes wrong and we capture
+*  and error
+ */
 func GetErrorMsg(err error) (Response, error) {
 	return Response{
 		Message: "Got back err: " + err.Error(),
 	}, err
+}
+
+/*
+	PrintLinesByStatus prints subway statuses by lines
+	only used for debugging
+*/
+func PrintLinesByStatus(subwayMap map[string]string) {
+	for k, v := range subwayMap {
+		fmt.Println("line: ", k, ": ", v)
+	}
 }
 
 func main() {
